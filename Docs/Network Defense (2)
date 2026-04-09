@@ -1,0 +1,139 @@
+# Network Defense Layer — Person 2
+### AWS WAF + API Gateway + VPC Flow Logs + AWS Shield Standard
+
+---
+
+## What This Layer Does
+
+Person 2 is responsible for **intercepting and blocking SQL injection attempts at the network level** before they reach the application. This layer acts as the first line of defence — inspecting every incoming HTTP request and deciding whether to allow or block it.
+
+---
+
+## AWS Services Used
+
+### AWS WAF (Web Application Firewall)
+WAF inspects HTTP/HTTPS requests and blocks those matching defined attack rules.
+
+**How it is used:**
+- Placed in front of the web application as the primary defence
+- Uses the **AWS Managed Rules SQLi rule set** (`AWSManagedRulesSQLiRuleSet`) to automatically block known SQL injection patterns:
+  - `UNION SELECT`
+  - `' OR 1=1--`
+  - `DROP TABLE`
+  - `SLEEP()`
+- **Before/after experiment:** The team runs the same SQLMap attacks with WAF disabled and enabled, comparing how many payloads get through
+- Generates detailed access logs (blocked and allowed) streamed to Kinesis (Person 4)
+
+### AWS API Gateway
+API Gateway is the single entry point for all traffic to the application.
+
+**How it is used:**
+- All attacker and legitimate traffic passes through API Gateway before reaching the web app
+- **Rate limiting:** Throttles requests to 100 per minute per IP — slowing down automated SQLMap scans
+- **Request validation:** Rejects malformed requests (wrong content-type, missing required fields) before they reach the app
+
+### VPC Flow Logs
+Captures metadata on all network traffic within the Virtual Private Cloud.
+
+**How it is used:**
+- Records source/destination IPs, ports, protocol, and accept/reject status for all traffic
+- Provides low-level **forensic evidence** of the attack (e.g., which IPs made how many connections)
+- Automatically consumed by GuardDuty (Person 3) to detect port scanning and unusual traffic patterns
+
+### AWS Shield Standard
+Free, automatic DDoS protection enabled on all AWS accounts.
+
+**How it is used:**
+- Protects infrastructure from **volumetric network attacks** (Layer 3/4) so that heavy SQLMap scans don't cause downtime
+- Complements WAF: WAF handles application-layer attacks (Layer 7), Shield handles network-layer attacks
+
+---
+
+## Defence-in-Depth Model
+
+```
+Internet
+   │
+   ▼
+[ AWS Shield ]  ← Layer 3/4 DDoS protection
+   │
+   ▼
+[ API Gateway ] ← Rate limiting + request validation
+   │
+   ▼
+[ AWS WAF ]     ← SQLi pattern blocking (Layer 7)
+   │
+   ▼
+[ Web App EC2 ] ← Application (Flask / DVWA)
+   │
+   ▼
+[ RDS MySQL ]   ← Database
+```
+
+---
+
+## Step-by-Step Setup
+
+1. **Configure AWS WAF:**
+   - Create a Web ACL in the AWS Console
+   - Add the managed rule group: `AWSManagedRulesSQLiRuleSet`
+   - Add a custom rule to block requests containing `UNION`, `SELECT`, `DROP`, `SLEEP`
+   - Associate the Web ACL with API Gateway
+
+2. **Deploy API Gateway:**
+   - Create a REST API pointing to the web app EC2
+   - Set usage plan: 100 requests/minute per API key
+   - Enable request validation (content-type: application/json, required fields)
+
+3. **Enable VPC Flow Logs:**
+   - Go to VPC → Your VPC → Flow Logs → Create
+   - Destination: CloudWatch Log Group `/vpc/flow-logs`
+   - Filter: All traffic (accept + reject)
+
+4. **Enable AWS Shield Standard:**
+   - Automatically active — no configuration needed
+   - Optionally subscribe to Shield Advanced for detailed DDoS reporting
+
+5. **Run comparison test:**
+   ```
+   Test 1: Disable WAF → run SQLMap → record how many payloads succeed
+   Test 2: Enable WAF  → run SQLMap → record how many payloads are blocked
+   ```
+   Document results in a blocked vs. bypassed comparison table.
+
+---
+
+## WAF Rule Reference
+
+| Rule | Pattern Blocked | Severity |
+|------|----------------|----------|
+| SQLi_UNION | `UNION SELECT` | HIGH |
+| SQLi_COMMENT | `--`, `#`, `/**/` | MEDIUM |
+| SQLi_BOOLEAN | `OR 1=1`, `AND 1=1` | MEDIUM |
+| SQLi_SLEEP | `SLEEP()`, `WAITFOR` | HIGH |
+| SQLi_DROP | `DROP TABLE`, `TRUNCATE` | CRITICAL |
+
+---
+
+## Report Section Ownership
+
+| Section | Title |
+|---------|-------|
+| Section 5 | Implementation: WAF & Network Defense |
+
+Include in your section:
+- WAF rule configurations (screenshots or Terraform config)
+- Blocked vs. bypassed payload comparison table
+- API Gateway rate-limiting test results
+- VPC Flow Log sample showing attack traffic
+
+---
+
+## Key Outputs / Deliverables
+
+- [ ] WAF Web ACL created with SQLi managed rules
+- [ ] API Gateway deployed as single entry point with rate limiting
+- [ ] VPC Flow Logs enabled and streaming to CloudWatch
+- [ ] Shield Standard confirmed active
+- [ ] Comparison table: WAF off vs. WAF on attack results
+- [ ] WAF access logs flowing into Kinesis (for Person 4)
