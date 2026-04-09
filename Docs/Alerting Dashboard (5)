@@ -1,0 +1,179 @@
+# Alerting, Dashboard & Reporting — Person 5
+### Amazon SNS + AWS Amplify + AWS Security Hub
+
+---
+
+## What This Layer Does
+
+Person 5 is responsible for **delivering alerts to the team, building the visual dashboard, and coordinating the final report and presentation**. This is the user-facing output of the entire detection pipeline — when an attack is found, this layer notifies the team and displays it on a live dashboard.
+
+---
+
+## AWS Services Used
+
+### Amazon SNS (Simple Notification Service)
+SNS is a fully managed pub/sub messaging service. Publishers send messages to a topic; all subscribers receive it instantly.
+
+**How it is used:**
+- An **SNS topic** (`sql-injection-alerts`) receives messages from Lambda (Person 3) on HIGH or CRITICAL detections
+- **All 5 team members** subscribe with their email addresses
+- **Optional SMS** subscription sends text message alerts to a designated phone number
+- Each notification includes:
+  - Timestamp
+  - Source IP address
+  - Attack type (union-based, blind, error-based)
+  - Severity level (HIGH / CRITICAL)
+  - The exact SQL payload that triggered the detection
+
+### AWS Amplify
+Amplify is a full-stack platform for deploying web apps on AWS with built-in CI/CD from a Git repository.
+
+**How it is used:**
+- A **React web application** is built and deployed to Amplify as the live visual dashboard
+- **Live attack feed:** Displays the 20 most recent detection events (pulled from DynamoDB, populated by Lambda)
+- **Charts:**
+  - Bar chart — attack type breakdown (union vs. blind vs. error-based)
+  - Pie chart — blocked vs. unblocked request rates
+  - World map — geographic distribution of source IPs
+- **Security Hub score** embedded on the dashboard for at-a-glance security posture
+
+### AWS Security Hub
+Security Hub is a centralised security posture management service. It aggregates findings from GuardDuty, WAF, Inspector, and Config into one view.
+
+**How it is used:**
+- **Findings aggregation:** Ingests GuardDuty findings and Lambda-published findings in one console
+- **Compliance scoring:** Evaluates the project against the **CIS AWS Foundations Benchmark** — produces a compliance percentage
+- **Executive reporting:** The Security Hub summary provides the top-level security posture view for the final report
+- **Normalised severity:** Displays GuardDuty and Lambda findings side by side with consistent severity labels
+
+---
+
+## Alert Flow
+
+```
+Lambda detects HIGH/CRITICAL attack
+          │
+          ▼
+  Publishes to SNS Topic
+  "sql-injection-alerts"
+          │
+    ┌─────┴─────┐
+    ▼           ▼
+[ Email ]    [ SMS ]
+(all 5      (phone
+ members)    number)
+
+Also:
+Lambda → DynamoDB → React Dashboard (Amplify)
+GuardDuty → Security Hub → Dashboard score widget
+```
+
+---
+
+## Step-by-Step Setup
+
+1. **Enable AWS Security Hub:**
+   - AWS Console → Security Hub → Enable
+   - Enable standard: **CIS AWS Foundations Benchmark v1.4**
+   - Enable integration with GuardDuty (automatic)
+
+2. **Create SNS topic and subscriptions:**
+   ```bash
+   # Create topic
+   aws sns create-topic --name sql-injection-alerts
+
+   # Subscribe team emails
+   aws sns subscribe --topic-arn <TOPIC_ARN> --protocol email --notification-endpoint person1@email.com
+   # Repeat for all 5 members
+
+   # Optional SMS
+   aws sns subscribe --topic-arn <TOPIC_ARN> --protocol sms --notification-endpoint +1234567890
+   ```
+
+3. **Create DynamoDB table for the dashboard:**
+   - Table name: `sql-injection-findings`
+   - Partition key: `id` (String)
+   - Sort key: `timestamp` (String)
+   - Lambda (Person 3) writes to this table on every detection
+
+4. **Build the React dashboard:**
+
+   Key components to build:
+   ```
+   src/
+   ├── components/
+   │   ├── LiveFeed.jsx        ← 20 most recent detections from DynamoDB
+   │   ├── AttackTypeChart.jsx ← Bar chart (Chart.js) — union vs blind vs error
+   │   ├── BlockedPieChart.jsx ← Pie chart — blocked vs unblocked
+   │   ├── IPWorldMap.jsx      ← World map of source IPs
+   │   └── SecurityScore.jsx  ← Security Hub compliance score
+   └── App.jsx
+   ```
+
+5. **Deploy to AWS Amplify:**
+   - Push React app to GitHub
+   - AWS Console → Amplify → New app → Connect repository
+   - Amplify auto-builds and deploys on every commit
+
+6. **Record the demo video (5–7 minutes):**
+
+   Suggested recording structure:
+   | Time | Content |
+   |------|---------|
+   | 0:00–1:00 | Project overview and architecture diagram |
+   | 1:00–2:30 | Run SQLMap attack (Person 1's terminal) |
+   | 2:30–3:30 | Show WAF blocking in real time (Person 2's console) |
+   | 3:30–4:30 | Show Lambda detection firing and SNS email arriving |
+   | 4:30–5:30 | Live dashboard updating with attack events |
+   | 5:30–7:00 | Security Hub score and GuardDuty findings |
+
+---
+
+## Dashboard — Wireframe
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  SQL Injection Detection Dashboard                       │
+│  Security Hub Score: 87%  |  Last updated: 14:32:05     │
+├────────────────────────┬────────────────────────────────┤
+│  Live Attack Feed      │  Attack Type Breakdown (Bar)   │
+│  ──────────────────    │  ┌──────────────────────────┐  │
+│  14:31 CRITICAL UNION  │  │ Union ████████ 45%       │  │
+│  14:30 HIGH    SLEEP   │  │ Blind ████ 25%           │  │
+│  14:29 MEDIUM  OR 1=1  │  │ Error ██████ 30%         │  │
+│  14:28 LOW     quote   │  └──────────────────────────┘  │
+├────────────────────────┼────────────────────────────────┤
+│  Blocked vs Allowed    │  Source IP World Map           │
+│  (Pie Chart)           │  [map showing attack origins]  │
+│  Blocked: 78%          │                                │
+│  Allowed: 22%          │                                │
+└────────────────────────┴────────────────────────────────┘
+```
+
+---
+
+## Report Section Ownership
+
+| Section | Title |
+|---------|-------|
+| Section 1 | Abstract & Introduction |
+| Section 8 | Implementation: Alerting & Dashboard |
+| Section 10 | Conclusion & Future Work (coordinate with all) |
+
+Also responsible for:
+- Coordinating all sections from team members
+- Formatting and final submission of the report
+- Producing the demo video
+
+---
+
+## Key Outputs / Deliverables
+
+- [ ] Security Hub enabled with CIS Benchmark standard active
+- [ ] SNS topic created, all 5 team members subscribed by email
+- [ ] SNS alert received within 2s of Lambda HIGH/CRITICAL detection
+- [ ] DynamoDB table receiving findings from Lambda
+- [ ] React dashboard built with all 4 visualisation components
+- [ ] Dashboard deployed live on AWS Amplify
+- [ ] 5–7 minute demo video recorded
+- [ ] Final report collated and submitted
