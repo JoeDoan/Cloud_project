@@ -1,0 +1,6 @@
+# macOS files
+.DS_Store
+**/.DS_Store
+
+# Ignore assignment docs
+tasks/
