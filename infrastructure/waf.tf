@@ -81,6 +81,8 @@ resource "aws_wafv2_web_acl" "sqli_detection_waf" {
 }
 
 resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
-  log_destination_configs = [var.kinesis_firehose_arn]
-  resource_arn            = aws_wafv2_web_acl.sqli_detection_waf.arn
+  log_destination_configs = [
+    "arn:aws:logs:us-east-2:${data.aws_caller_identity.current.account_id}:log-group:aws-waf-logs-sqli-project"
+  ]
+  resource_arn = aws_wafv2_web_acl.sqli_detection_waf.arn
 }
