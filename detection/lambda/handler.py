@@ -1,7 +1,10 @@
-import json, base64, boto3, os, datetime, re
+import json, base64, boto3, os, datetime, re, uuid
 
-SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:867490540204:sqli-attack-alerts")
-sns = boto3.client("sns")
+SNS_TOPIC_ARN   = os.environ.get("SNS_TOPIC_ARN", "")
+DYNAMODB_TABLE  = os.environ.get("DYNAMODB_TABLE", "sql-injection-findings")
+
+sns      = boto3.client("sns", region_name="us-east-2")
+dynamodb = boto3.resource("dynamodb", region_name="us-east-2")
 
 SQLI_PATTERNS = [
     ("union_select",        re.compile(r'(?i)union\s+select'),                             'CRITICAL'),
@@ -26,6 +29,25 @@ def classify(uri, query):
             if SEVERITY_RANK.get(severity, 0) > SEVERITY_RANK.get(max_severity, 0):
                 max_severity = severity
     return {"detected": len(matches) > 0, "severity": max_severity, "matches": matches}
+
+def write_to_dynamodb(finding):
+    try:
+        table = dynamodb.Table(DYNAMODB_TABLE)
+        # TTL: auto-expire after 7 days
+        expiry = int((datetime.datetime.utcnow() + datetime.timedelta(days=7)).timestamp())
+        table.put_item(Item={
+            "id":         str(uuid.uuid4()),
+            "timestamp":  finding["timestamp"],
+            "source_ip":  finding["source_ip"],
+            "uri":        finding["uri"],
+            "query":      finding["query"],
+            "severity":   finding["severity"],
+            "patterns":   json.dumps(finding["patterns"]),
+            "waf_action": finding["waf_action"],
+            "expiry":     expiry
+        })
+    except Exception as e:
+        print(f"[DynamoDB ERROR] {e}")
 
 def lambda_handler(event, context):
     detections = []
@@ -57,6 +79,10 @@ def lambda_handler(event, context):
             detections.append(finding)
             print(f"[DETECTION] {result['severity']} | {source_ip} | {uri}")
 
+            # Write every detection to DynamoDB for the React dashboard
+            write_to_dynamodb(finding)
+
+            # Alert via SNS for HIGH/CRITICAL only
             if result["severity"] in ("HIGH", "CRITICAL") and SNS_TOPIC_ARN:
                 sns.publish(
                     TopicArn=SNS_TOPIC_ARN,
