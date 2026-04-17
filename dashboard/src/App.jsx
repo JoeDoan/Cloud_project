@@ -5,9 +5,8 @@ import BlockedPieChart from './components/BlockedPieChart';
 import SecurityScore from './components/SecurityScore';
 
 // ── AWS Config ────────────────────────────────────────────────────────────────
-const API_URL   = process.env.REACT_APP_API_URL || '';   // Set in Amplify env vars
-const REGION    = 'us-east-2';
-const TABLE     = 'sql-injection-findings';
+const API_URL = process.env.REACT_APP_API_URL
+  || 'https://2y68q1dt27.execute-api.us-east-2.amazonaws.com/prod';
 
 // ── Fetch recent findings from your API Gateway → Lambda → DynamoDB ───────────
 async function fetchFindings() {
