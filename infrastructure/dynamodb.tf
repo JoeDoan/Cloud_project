@@ -27,7 +27,7 @@ resource "aws_dynamodb_table" "sqli_findings" {
 
 # Lookup the existing Lambda execution role (deployed by Person 3)
 data "aws_iam_role" "lambda_exec" {
-  name = "sql-injection-detector-role-d8rblgsr"
+  name = "lambda-sqli-role"
 }
 
 # Allow Lambda to write findings into DynamoDB

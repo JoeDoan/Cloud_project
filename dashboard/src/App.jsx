@@ -29,7 +29,7 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     const data = await fetchFindings();
-    setFindings(data.slice(0, 20)); // keep last 20
+    setFindings(data.slice(0, 100)); // keep last 100
     setLastUpdated(new Date());
   }, []);
 

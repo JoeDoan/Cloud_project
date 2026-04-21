@@ -12,12 +12,12 @@ def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
 
     # Full scan — table is small (<1000 rows with 7-day TTL)
-    resp = table.scan(Limit=50)
+    resp = table.scan(Limit=200)
     items = resp.get("Items", [])
 
     # Sort newest first
     items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-    items = items[:20]
+    items = items[:100]
 
     return {
         "statusCode": 200,
