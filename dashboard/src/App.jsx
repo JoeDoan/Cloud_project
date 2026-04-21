@@ -10,28 +10,28 @@ const API_URL = process.env.REACT_APP_API_URL
 
 // ── Fetch recent findings from your API Gateway → Lambda → DynamoDB ───────────
 async function fetchFindings() {
-  if (!API_URL) return { findings: [], totalCount: 0 };
+  if (!API_URL) return { findings: [], summary: {} };
   try {
     const res = await fetch(`${API_URL}/findings`);
     const data = await res.json();
-    return { findings: data.findings || [], totalCount: data.totalCount || 0 };
+    return { findings: data.findings || [], summary: data.summary || {} };
   } catch (e) {
     console.error('[fetchFindings]', e);
-    return { findings: [], totalCount: 0 };
+    return { findings: [], summary: {} };
   }
 }
 
 export default function App() {
   const [findings, setFindings]       = useState([]);
-  const [totalCount, setTotalCount]   = useState(0);
+  const [summary, setSummary]         = useState({});
   const [secScore, setSecScore]       = useState(87);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isLive, setIsLive]           = useState(true);
 
   const refresh = useCallback(async () => {
-    const { findings: data, totalCount: count } = await fetchFindings();
+    const { findings: data, summary: stats } = await fetchFindings();
     setFindings(data.slice(0, 200));
-    setTotalCount(count);
+    setSummary(stats);
     setLastUpdated(new Date());
   }, []);
 
@@ -64,10 +64,10 @@ export default function App() {
       {/* ── Summary KPI Bar ── */}
       <div style={styles.kpiRow}>
         {[
-          { label: 'Total Detections', value: totalCount,                                              color: '#3b82f6' },
-          { label: 'Critical',         value: findings.filter(f=>f.severity==='CRITICAL').length, color: '#ef4444' },
-          { label: 'High',             value: findings.filter(f=>f.severity==='HIGH').length,     color: '#f97316' },
-          { label: 'Blocked',          value: findings.filter(f=>f.waf_action==='BLOCK').length,  color: '#a855f7' },
+          { label: 'Total Detections', value: summary.totalCount || 0,    color: '#3b82f6' },
+          { label: 'Critical',         value: summary.criticalCount || 0, color: '#ef4444' },
+          { label: 'High',             value: summary.highCount || 0,     color: '#f97316' },
+          { label: 'Blocked',          value: summary.blockedCount || 0,  color: '#a855f7' },
         ].map(kpi => (
           <div key={kpi.label} style={styles.kpiCard}>
             <span style={{ ...styles.kpiNum, color: kpi.color }}>{kpi.value}</span>
@@ -80,8 +80,8 @@ export default function App() {
       <div style={styles.grid}>
         <LiveFeed          findings={findings} />
         <AttackTypeChart   findings={findings} />
-        <BlockedPieChart   findings={findings} />
-        <SecurityScore     findings={findings} score={secScore} />
+        <BlockedPieChart   findings={findings} summary={summary} />
+        <SecurityScore     findings={findings} summary={summary} score={secScore} />
       </div>
     </div>
   );

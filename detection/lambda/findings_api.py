@@ -28,7 +28,17 @@ def lambda_handler(event, context):
     # Sort newest first
     items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
 
-    # Return up to 200 most recent findings + total count for KPI
+    # Compute summary stats from ALL items (not just the displayed 200)
+    summary = {
+        "totalCount":    len(items),
+        "criticalCount": sum(1 for i in items if i.get("severity") == "CRITICAL"),
+        "highCount":     sum(1 for i in items if i.get("severity") == "HIGH"),
+        "mediumCount":   sum(1 for i in items if i.get("severity") == "MEDIUM"),
+        "blockedCount":  sum(1 for i in items if i.get("waf_action") == "BLOCK"),
+        "allowedCount":  sum(1 for i in items if i.get("waf_action") == "ALLOW"),
+    }
+
+    # Return up to 200 most recent findings + accurate summary counts
     return {
         "statusCode": 200,
         "headers": {
@@ -37,7 +47,7 @@ def lambda_handler(event, context):
         },
         "body": json.dumps({
             "findings": items[:200],
-            "totalCount": len(items)
+            "summary": summary
         }, default=str)
     }
 

@@ -4,10 +4,10 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-export default function BlockedPieChart({ findings }) {
-  const blocked = findings.filter(f => f.waf_action === 'BLOCK').length;
-  const allowed = findings.filter(f => f.waf_action !== 'BLOCK').length;
-  const total = findings.length || 1;
+export default function BlockedPieChart({ findings, summary = {} }) {
+  const blocked = summary.blockedCount || findings.filter(f => f.waf_action === 'BLOCK').length;
+  const allowed = summary.allowedCount || findings.filter(f => f.waf_action !== 'BLOCK').length;
+  const total = (blocked + allowed) || 1;
 
   const data = {
     labels: ['Blocked', 'Allowed'],

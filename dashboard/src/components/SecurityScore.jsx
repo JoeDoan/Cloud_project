@@ -7,10 +7,11 @@ const SCORE_COLOR = (score) => {
   return '#ef4444';
 };
 
-export default function SecurityScore({ score, findings }) {
-  const critical = findings.filter(f => f.severity === 'CRITICAL').length;
-  const high     = findings.filter(f => f.severity === 'HIGH').length;
-  const medium   = findings.filter(f => f.severity === 'MEDIUM').length;
+export default function SecurityScore({ score, findings, summary = {} }) {
+  const critical = summary.criticalCount || findings.filter(f => f.severity === 'CRITICAL').length;
+  const high     = summary.highCount     || findings.filter(f => f.severity === 'HIGH').length;
+  const medium   = summary.mediumCount   || findings.filter(f => f.severity === 'MEDIUM').length;
+  const total    = summary.totalCount    || findings.length;
   const color    = SCORE_COLOR(score);
 
   // Circular SVG progress ring
@@ -56,7 +57,7 @@ export default function SecurityScore({ score, findings }) {
           <div style={styles.statRow}>
             <span style={{ ...styles.dot, background: '#3b82f6' }} />
             <span style={styles.statLabel}>Total Events</span>
-            <span style={styles.statNum}>{findings.length}</span>
+            <span style={styles.statNum}>{total}</span>
           </div>
         </div>
       </div>
