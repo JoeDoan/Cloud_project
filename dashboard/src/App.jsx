@@ -10,26 +10,28 @@ const API_URL = process.env.REACT_APP_API_URL
 
 // ── Fetch recent findings from your API Gateway → Lambda → DynamoDB ───────────
 async function fetchFindings() {
-  if (!API_URL) return [];
+  if (!API_URL) return { findings: [], totalCount: 0 };
   try {
     const res = await fetch(`${API_URL}/findings`);
     const data = await res.json();
-    return data.findings || [];
+    return { findings: data.findings || [], totalCount: data.totalCount || 0 };
   } catch (e) {
     console.error('[fetchFindings]', e);
-    return [];
+    return { findings: [], totalCount: 0 };
   }
 }
 
 export default function App() {
-  const [findings, setFindings]     = useState([]);
-  const [secScore, setSecScore]     = useState(87);
+  const [findings, setFindings]       = useState([]);
+  const [totalCount, setTotalCount]   = useState(0);
+  const [secScore, setSecScore]       = useState(87);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [isLive, setIsLive]         = useState(true);
+  const [isLive, setIsLive]           = useState(true);
 
   const refresh = useCallback(async () => {
-    const data = await fetchFindings();
-    setFindings(data.slice(0, 100)); // keep last 100
+    const { findings: data, totalCount: count } = await fetchFindings();
+    setFindings(data.slice(0, 200));
+    setTotalCount(count);
     setLastUpdated(new Date());
   }, []);
 
@@ -62,7 +64,7 @@ export default function App() {
       {/* ── Summary KPI Bar ── */}
       <div style={styles.kpiRow}>
         {[
-          { label: 'Total Detections', value: findings.length,                             color: '#3b82f6' },
+          { label: 'Total Detections', value: totalCount,                                              color: '#3b82f6' },
           { label: 'Critical',         value: findings.filter(f=>f.severity==='CRITICAL').length, color: '#ef4444' },
           { label: 'High',             value: findings.filter(f=>f.severity==='HIGH').length,     color: '#f97316' },
           { label: 'Blocked',          value: findings.filter(f=>f.waf_action==='BLOCK').length,  color: '#a855f7' },
