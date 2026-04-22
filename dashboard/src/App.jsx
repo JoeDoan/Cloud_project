@@ -79,7 +79,7 @@ export default function App() {
       {/* ── 4-chart Grid ── */}
       <div style={styles.grid}>
         <LiveFeed          findings={findings} />
-        <AttackTypeChart   findings={findings} />
+        <AttackTypeChart   findings={findings} summary={summary} />
         <BlockedPieChart   findings={findings} summary={summary} />
         <SecurityScore     findings={findings} summary={summary} score={secScore} />
       </div>

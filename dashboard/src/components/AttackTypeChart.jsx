@@ -7,12 +7,16 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-export default function AttackTypeChart({ findings }) {
-  const counts = findings.reduce((acc, f) => {
-    const patterns = JSON.parse(f.patterns || '[]');
-    patterns.forEach(p => { acc[p.pattern] = (acc[p.pattern] || 0) + 1; });
-    return acc;
-  }, {});
+export default function AttackTypeChart({ findings, summary }) {
+  // Use backend-computed pattern counts (all items) if available,
+  // otherwise fall back to counting from the 200 most recent findings
+  const counts = (summary && summary.patternCounts)
+    ? summary.patternCounts
+    : findings.reduce((acc, f) => {
+        const patterns = JSON.parse(f.patterns || '[]');
+        patterns.forEach(p => { acc[p.pattern] = (acc[p.pattern] || 0) + 1; });
+        return acc;
+      }, {});
 
   const data = {
     labels: Object.keys(counts).map(k => k.replace(/_/g, ' ')),

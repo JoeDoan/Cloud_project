@@ -29,6 +29,16 @@ def lambda_handler(event, context):
     items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
 
     # Compute summary stats from ALL items (not just the displayed 200)
+    pattern_counts = {}
+    for i in items:
+        try:
+            patterns = json.loads(i.get("patterns", "[]"))
+            for p in patterns:
+                name = p.get("pattern", "unknown")
+                pattern_counts[name] = pattern_counts.get(name, 0) + 1
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     summary = {
         "totalCount":    len(items),
         "criticalCount": sum(1 for i in items if i.get("severity") == "CRITICAL"),
@@ -36,6 +46,7 @@ def lambda_handler(event, context):
         "mediumCount":   sum(1 for i in items if i.get("severity") == "MEDIUM"),
         "blockedCount":  sum(1 for i in items if i.get("waf_action") == "BLOCK"),
         "allowedCount":  sum(1 for i in items if i.get("waf_action") == "ALLOW"),
+        "patternCounts": pattern_counts,
     }
 
     # Return up to 200 most recent findings + accurate summary counts
