@@ -5,6 +5,7 @@ A cloud-native, end-to-end SQL injection detection and response system built on 
 > **UMKC — Cloud Computing Course Project (Spring 2026)**
 
 [![Live Dashboard](https://img.shields.io/badge/Dashboard-LIVE-22c55e?style=for-the-badge)](https://main.dpgownrmhz6a9.amplifyapp.com/)
+[![Demo Video](https://img.shields.io/badge/Demo-Video-EA4335?style=for-the-badge&logo=youtube)](https://umsystem.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=411ff7ff-9afc-48b3-8636-b4350022ccc5)
 [![AWS](https://img.shields.io/badge/AWS-14%20Services-FF9900?style=for-the-badge&logo=amazon-aws)](https://aws.amazon.com/)
 [![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?style=for-the-badge&logo=terraform)](https://www.terraform.io/)
 
@@ -135,7 +136,7 @@ The React dashboard (deployed on AWS Amplify) polls the findings API every 10 se
 
 ## Demo Video
 
-🎬 **[`video demo/Video demo.mp4`](video%20demo/Video%20demo.mp4)**
+🎬 **[Watch the full live demo on Panopto](https://umsystem.hosted.panopto.com/Panopto/Pages/Viewer.aspx?id=411ff7ff-9afc-48b3-8636-b4350022ccc5)**
 
 The demo covers:
 1. **Normal request** — showing the vulnerable Flask app responding to clean queries
@@ -205,8 +206,6 @@ The demo covers:
 └── tasks/
     ├── project_report.md         # Full technical report
     └── Project_Flow_QA_Prep.html # Architecture & Q&A guide
-└── video demo/
-    └── Video demo.mp4            # Full live demo recording
 ```
 
 ---
