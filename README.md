@@ -1,90 +1,259 @@
-# Cloud_computing_Project
-Detecting Data Leaks via SQL Injection : AWS
+# 🛡️ Detecting Data Leaks via SQL Injection on AWS
+
+A cloud-native, end-to-end SQL injection detection and response system built on **14 AWS services**. The system simulates realistic attacks against a deliberately vulnerable web application, blocks them at the network perimeter, detects obfuscated payloads that bypass WAF using a custom serverless classifier, and surfaces findings on a real-time dashboard with automated alerting.
+
+> **UMKC — Cloud Computing Course Project (Spring 2026)**
+
+[![Live Dashboard](https://img.shields.io/badge/Dashboard-LIVE-22c55e?style=for-the-badge)](https://main.dpgownrmhz6a9.amplifyapp.com/)
+[![AWS](https://img.shields.io/badge/AWS-14%20Services-FF9900?style=for-the-badge&logo=amazon-aws)](https://aws.amazon.com/)
+[![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?style=for-the-badge&logo=terraform)](https://www.terraform.io/)
 
 ---
 
-## Overview
+## Key Results
 
-This project implements a cloud-native system on **Amazon Web Services (AWS)** to simulate, detect, and respond to SQL injection attacks that cause data leaks. SQL injection is one of the most critical web vulnerabilities (OWASP Top 10), and this project demonstrates how AWS services can be combined into a real-time detection and response pipeline.
+| Metric | Value |
+|--------|-------|
+| **WAF Block Rate** | 94% of all detected attacks |
+| **Overall Detection Rate** | ~100% (WAF + Lambda combined) |
+| **Detection Latency** | < 30 seconds end-to-end |
+| **Classification Patterns** | 8 regex patterns across 4 severity levels |
+| **CIS Benchmark Compliance** | 87% |
+| **Infrastructure Cost** | ~$5–10/month |
+| **Deployment Time** | ~5 minutes via `terraform apply` |
 
----
+### Research Highlight — Dual-Layer Detection Gap
 
-## Team
-
-| Person | Role | Layer | AWS Services |
-|--------|------|-------|--------------|
-| Person 1 | Attack Simulation & Target Setup | Attack Layer | EC2 + RDS (MySQL) |
-| Person 2 | Network Defense | App/Network Layer | WAF + API Gateway + VPC Flow Logs + Shield |
-| Person 3 | Detection Engine | Detection Layer | Lambda + GuardDuty |
-| Person 4 | Logging & Data Pipeline | Logging Layer | CloudWatch + S3 + Kinesis |
-| Person 5 | Alerting, Dashboard & Reporting | Alerting/UI Layer | SNS + Amplify + Security Hub |
+AWS WAF blocks **94%** of standard SQL injection payloads. However, **6% of attacks bypass WAF** through URL encoding and obfuscation techniques (e.g., `%4F%52%20%31%3D%31` → `OR 1=1`). Our custom Lambda classifier URL-decodes payloads before applying regex patterns, successfully catching these evasive payloads. This demonstrates that **managed WAF rules alone are insufficient** — a secondary serverless detection layer significantly improves coverage.
 
 ---
 
 ## Architecture
 
-The system is divided into **5 layers**, each owned by one team member:
-
 ```
-[ Attacker EC2 ] ──► [ API Gateway ] ──► [ WAF ] ──► [ Web App EC2 ] ──► [ RDS MySQL ]
-                                           │
-                                    [ VPC Flow Logs ]
-                                           │
-                                   [ Kinesis Stream ]
-                               ┌──────────┴──────────┐
-                          [ Lambda ]            [ S3 Archive ]
-                        (Detection)           (Firehose)
-                               │
-                    ┌──────────┴──────────┐
-               [ SNS Alert ]       [ CloudWatch ]
-                    │                    │
-             [ Email/SMS ]        [ Dashboard ]
-                    │
-          [ Amplify Dashboard ]
-                    │
-           [ Security Hub ]
+                        ┌─────────────────────────────────────────────────────────┐
+                        │                    AWS Cloud (us-east-2)                │
+                        │                                                         │
+  ┌────────────┐        │  ┌──────────────┐    ┌───────────┐    ┌──────────────┐  │
+  │ Attacker   │───────►│  │ API Gateway  │───►│  AWS WAF  │───►│  Flask App   │  │
+  │ EC2        │        │  │ + API Key    │    │  3 Rules  │    │  EC2         │  │
+  │ (SQLMap)   │        │  │ + Throttle   │    │           │    │  (Vulnerable)│  │
+  └────────────┘        │  └──────────────┘    └─────┬─────┘    └──────┬───────┘  │
+                        │                            │                 │          │
+                        │                    Logs ALL traffic    ┌─────▼──────┐   │
+                        │                            │           │ RDS MySQL  │   │
+                        │                   ┌────────▼────────┐  │ (20 users) │   │
+                        │                   │ CloudWatch Logs  │  └────────────┘   │
+                        │                   └────────┬────────┘                    │
+                        │                            │ Subscription Filter         │
+                        │                   ┌────────▼────────┐                    │
+                        │                   │ Kinesis Stream   │                   │
+                        │                   │ (2 shards)       │                   │
+                        │                   └───┬─────────┬────┘                   │
+                        │                       │         │                        │
+                        │              ┌────────▼───┐ ┌───▼──────────┐             │
+                        │              │ Lambda     │ │ Firehose     │             │
+                        │              │ sqli-      │ │ → S3 Archive │             │
+                        │              │ detector   │ │   (Glacier)  │             │
+                        │              └──┬─────┬───┘ └──────────────┘             │
+                        │                 │     │                                   │
+                        │        ┌────────▼┐  ┌─▼──────────┐                       │
+                        │        │DynamoDB │  │ SNS Topic  │                       │
+                        │        │findings │  │ → 5 Emails │                       │
+                        │        └────┬────┘  └────────────┘                       │
+                        │             │                                            │
+                        │     ┌───────▼───────┐    ┌──────────────┐                │
+                        │     │ Lambda        │    │ Security Hub │                │
+                        │     │ findings-api  │    │ CIS 87%      │                │
+                        │     └───────┬───────┘    └──────┬───────┘                │
+                        │             │                   │                        │
+                        │     ┌───────▼───────────────────▼───────┐                │
+                        │     │     React Dashboard (Amplify)     │                │
+                        │     │     Polls every 10 seconds        │                │
+                        │     └───────────────────────────────────┘                │
+                        └─────────────────────────────────────────────────────────┘
 ```
 
-**Data flow:** Attack → API Gateway → WAF → App → Kinesis → Lambda (detect) → SNS (alert) → Dashboard
+**Data Flow:** Attack → API Gateway → WAF (Block/Allow) → CloudWatch → Kinesis → Lambda (Classify) → DynamoDB + SNS → Dashboard
 
 ---
 
+## Project Layers
 
-
-## How the Attack Pipeline Works
-
-1. **Person 1** launches an Ubuntu EC2 attacker VM and runs SQLMap against a deliberately vulnerable Flask web app backed by an RDS MySQL database.
-2. **Person 2** places AWS WAF and API Gateway in front of the app. WAF blocks known SQLi patterns; API Gateway rate-limits traffic.
-3. **Person 3** deploys a Python Lambda function that reads WAF logs from Kinesis in real time, applies regex to detect SQLi patterns, and classifies severity (LOW / MEDIUM / HIGH / CRITICAL).
-4. **Person 4** sets up Kinesis Data Streams to pipe all WAF logs to Lambda and S3. CloudWatch dashboards show live attack metrics.
-5. **Person 5** configures SNS to send email/SMS alerts on HIGH/CRITICAL findings, deploys a React dashboard on Amplify, and enables Security Hub for compliance scoring.
+| Layer | Owner | Description | AWS Services |
+|-------|-------|-------------|-------------|
+| **1. Attack Simulation** | Bhavya Chennu | Vulnerable Flask app + SQLMap attacks | EC2 (×2), RDS MySQL |
+| **2. Network Defense** | Joe Doan | Perimeter blocking + rate limiting | WAF v2, API Gateway, Shield, VPC Flow Logs |
+| **3. Detection Engine** | Geethika Padamati | Real-time payload classification | Lambda (Python 3.12) |
+| **4. Logging Pipeline** | Tony Nguyen | Stream processing + archival | Kinesis, Firehose, CloudWatch, S3 |
+| **5. Alerting & Dashboard** | Tina Nguyen | Visualization + compliance | SNS, Amplify, DynamoDB, Security Hub |
 
 ---
 
-## 10-Day Timeline
+## Detection Engine — 8 Custom Patterns
 
-| Day | Milestone |
-|-----|-----------|
-| 1 | AWS accounts, IAM roles, shared VPC, GitHub repo |
-| 2 | Vulnerable web app live, RDS populated, WAF rules active |
-| 3 | First SQLMap attack, Kinesis stream, Lambda deployed, GuardDuty on |
-| 4 | Lambda running on live traffic, SNS alerts configured |
-| 5 | End-to-end pipeline tested, S3 archiving, second attack run |
-| 6 | React dashboard on Amplify, Security Hub, CloudWatch dashboard |
-| 7 | Full demo video recorded, results captured |
-| 8–9 | Report written and peer-reviewed |
-| 10 | Final submission |
+The Lambda classifier applies compiled regex patterns to URL-decoded payloads, catching attacks that bypass WAF's managed rules:
+
+| Pattern | Regex | Severity | Detects |
+|---------|-------|----------|---------|
+| `union_select` | `(?i)union\s+select` | CRITICAL | Data exfiltration |
+| `information_schema` | `(?i)information_schema` | CRITICAL | Database reconnaissance |
+| `drop_table` | `(?i)drop\s+table` | CRITICAL | Data destruction |
+| `always_true_bypass` | `(?i)(' or 1=1\|" or 1=1)` | HIGH | Authentication bypass |
+| `sleep_delay` | `(?i)(sleep\s*\(\|waitfor)` | HIGH | Time-based blind SQLi |
+| `comment_injection` | `(--\|#\s\|/\*)` | MEDIUM | Payload termination |
+| `hex_encoding` | `0x[0-9a-fA-F]{4,}` | MEDIUM | WAF evasion via encoding |
+| `single_quote` | `['"]\s*(;\|--\|#\|/\*)` | LOW | Basic injection probing |
+
+**Key differentiator:** The Lambda applies `urllib.parse.unquote_plus()` before pattern matching, decoding percent-encoded payloads that WAF evaluates in raw form. This is why Lambda catches the 6% of attacks that WAF misses.
+
+---
+
+## WAF Configuration — 3 Rules
+
+| Priority | Rule | Type | Action |
+|----------|------|------|--------|
+| 1 | `AWSManagedRulesSQLiRuleSet` | AWS Managed | Block known SQLi patterns |
+| 2 | `AWSManagedRulesKnownBadInputsRuleSet` | AWS Managed | Block known exploits (Log4j, etc.) |
+| 3 | `sqli-rate-limit` | Custom | Block IPs exceeding 100 req/5 min |
+
+---
+
+## Live Dashboard
+
+**URL:** [https://main.dpgownrmhz6a9.amplifyapp.com/](https://main.dpgownrmhz6a9.amplifyapp.com/)
+
+The React dashboard (deployed on AWS Amplify) polls the findings API every 10 seconds and displays:
+
+- **KPI Bar** — Total Detections, Critical, High, Blocked counts
+- **Live Attack Feed** — Real-time scrolling list with source IP, URI, and severity
+- **Attack Type Breakdown** — Bar chart of pattern distribution across all findings
+- **Blocked vs Allowed** — Pie chart showing WAF block rate
+- **Security Hub Score** — 87% CIS Benchmark compliance
+
+---
+
+## Demo Video
+
+🎬 **[`video demo/Video demo.mp4`](video%20demo/Video%20demo.mp4)**
+
+The demo covers:
+1. **Normal request** — showing the vulnerable Flask app responding to clean queries
+2. **SQLMap attack without WAF** — full database dump (SSNs, credit cards) in under 2 minutes
+3. **SQLMap attack with WAF** — every injection attempt blocked with 403 Forbidden
+4. **Real-time dashboard** — live detection feed updating as attacks are classified
+5. **SNS email alerts** — automated notifications on HIGH/CRITICAL findings
+
+---
+
+## S3 Lifecycle — Log Archival
+
+| Age | Storage Class | Purpose |
+|-----|--------------|---------|
+| 0–30 days | S3 Standard | Active analysis |
+| 30–90 days | S3 Standard-IA | Infrequent access |
+| 90–365 days | S3 Glacier | Long-term forensics |
+| > 365 days | Deleted | Cost optimization |
 
 ---
 
 ## Technology Stack
 
 | Category | Technology |
-|----------|------------|
-| Infrastructure as Code | Terraform / AWS CloudFormation |
-| Vulnerable Web App | Python Flask / DVWA |
-| Attack Tools | SQLMap + Burp Suite Community |
-| Detection Logic | Python Lambda + `re` + `boto3` |
+|----------|-----------|
+| Vulnerable Web App | Python Flask + MySQL |
+| Attack Tools | SQLMap |
+| Detection Logic | Python 3.12 Lambda + `re` + `boto3` |
+| Stream Processing | Kinesis Data Streams (2 shards) |
 | Dashboard Frontend | React + Chart.js |
-| Report | LaTeX / Word (.docx) |
-| Demo Recording | OBS Studio |
+| Dashboard Hosting | AWS Amplify (auto-deploy from GitHub) |
+| Database | DynamoDB (findings, 7-day TTL) + RDS MySQL (target app) |
+| Alerting | SNS (email to 5 team members) |
+| Compliance | AWS Security Hub (CIS Benchmark v1.4) |
+| Infrastructure as Code | Terraform (not an AWS service) |
+
+---
+
+## Project Structure
+
+```
+├── attack-simulation/
+│   ├── vulnerable-app/          # Flask app with intentional SQLi vulnerability
+│   │   └── app.py               # String-concatenated SQL queries
+│   └── attack-scripts/
+│       └── run-attacks.sh        # SQLMap attack automation
+├── dashboard/
+│   └── src/
+│       ├── App.jsx               # Main dashboard with KPI bar
+│       └── components/
+│           ├── LiveFeed.jsx      # Real-time attack feed
+│           ├── AttackTypeChart.jsx # Pattern distribution bar chart
+│           ├── BlockedPieChart.jsx # WAF block rate visualization
+│           └── SecurityScore.jsx  # CIS benchmark display
+├── detection/
+│   └── lambda/
+│       ├── handler.py            # sqli-detector: 8-pattern classifier
+│       └── findings_api.py       # findings-api: DynamoDB → JSON endpoint
+├── infrastructure/
+│   ├── api_gateway.tf            # API Gateway + API key + throttling
+│   ├── waf.tf                    # WAF v2 with 3 rules
+│   ├── cloudwatch.tf             # Log groups + metric filters + alarms
+│   ├── kinesis.tf                # Data stream + Firehose + S3
+│   ├── dynamodb.tf               # Findings table + IAM policies
+│   ├── sns.tf                    # Alert topic + 5 email subscriptions
+│   └── s3.tf                     # Archive bucket + lifecycle policy
+└── tasks/
+    ├── project_report.md         # Full technical report
+    └── Project_Flow_QA_Prep.html # Architecture & Q&A guide
+└── video demo/
+    └── Video demo.mp4            # Full live demo recording
+```
+
+---
+
+## Quick Start — Deployment
+
+### Prerequisites
+- AWS CLI configured with `us-east-2` region
+- Terraform >= 1.0
+- Node.js >= 18 (for dashboard)
+
+### Infrastructure
+```bash
+cd infrastructure
+terraform init
+terraform apply
+```
+
+### Dashboard (Local Dev)
+```bash
+cd dashboard
+npm install
+npm start
+```
+
+### Run Attacks (from Attacker EC2)
+```bash
+# Without WAF — direct to Flask
+cd ~/sqlmap
+python3 sqlmap.py -u "http://<flask-ec2-ip>:5000/search?name=test" --dbs --dump --batch
+
+# With WAF — through API Gateway
+curl -s -H "x-api-key: <your-api-key>" \
+  "https://<api-gateway-url>/prod/search?name=test' UNION SELECT 1,2,3--"
+```
+
+---
+
+## Future Work
+
+- **ML-based detection** — Replace regex with a SageMaker-trained model for obfuscated payload detection
+- **Automated remediation** — Lambda adds attacker IP to WAF blocklist on CRITICAL events
+- **Benchmark evaluation** — Test against OWASP SQLi payload datasets for precision/recall metrics
+- **Multi-region deployment** — Extend to cross-region WAF with CloudFront integration
+
+---
+
+## License
+
+This project was developed for academic purposes at the University of Missouri–Kansas City (UMKC), Spring 2026.
